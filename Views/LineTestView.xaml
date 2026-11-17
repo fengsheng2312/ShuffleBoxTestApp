@@ -1,0 +1,142 @@
+<UserControl x:Class="ShuffleBoxTestApp.Views.LineTestView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:hc="https://handyorg.github.io/handycontrol"
+             xmlns:conv="clr-namespace:ShuffleBoxTestApp.Converters"
+             xmlns:models="clr-namespace:ShuffleBoxTestApp.Models">
+
+    <!--
+        线序测试页（独立子页面）。DataContext = MainViewModel。
+        模块：① ADC阈值设置 ② 默认遍历 ③ 已知遍历（上传旧表）。
+        进光 1-1~4-64 × 出光(基址可配) 遍历；读数大于阈值即找到。
+        结果表对齐模板四列；异常行整行标红（默认=出光重复；已知=新旧不一致）。
+    -->
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+        <conv:EnumMatchConverter x:Key="ModeDefault" EnumValue="{x:Static models:TestMode.DefaultTraversal}" />
+        <conv:EnumMatchConverter x:Key="ModeKnown" EnumValue="{x:Static models:TestMode.KnownTraversal}" />
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="380"/>
+            <ColumnDefinition Width="20"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- ============ 左列：功能模块配置 + 控制 ============ -->
+        <Border Grid.Column="0" Background="White" CornerRadius="8" Padding="15" Effect="{StaticResource EffectShadow2}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <TextBlock Text="线序测试" FontWeight="Bold" Foreground="{DynamicResource PrimaryBrush}" FontSize="16" Margin="0,0,0,12"/>
+
+                    <!-- ① ADC 阈值设置 -->
+                    <TextBlock Text="① ADC 阈值设置" FontWeight="Bold" Foreground="#333" Margin="0,0,0,6"/>
+                    <Grid Margin="0,0,0,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="阈值(大于即找到)" VerticalAlignment="Center" Foreground="#666" Margin="0,0,6,0"/>
+                        <TextBox Grid.Column="1" Height="28" VerticalContentAlignment="Center"
+                                 Text="{Binding ThresholdAdc, UpdateSourceTrigger=PropertyChanged}"/>
+                    </Grid>
+                    <!-- 进光范围：限定只测指定进光；留空=全部 -->
+                    <TextBlock Text="进光范围（留空=全部 1~256）" Foreground="#666" Margin="0,8,0,4"/>
+                    <TextBox Height="28" VerticalContentAlignment="Center"
+                             hc:InfoElement.Placeholder="如 1,3,4 或 1~50 或 1-50，可混合"
+                             Text="{Binding InputRangeText, UpdateSourceTrigger=PropertyChanged}"/>
+                    <TextBlock Text="读数PD=1、出光开关分组由光路硬件固定，无需设置" FontSize="10" Foreground="#AAA" Margin="0,4,0,12"/>
+
+                    <!-- ② / ③ 测试模式 -->
+                    <TextBlock Text="② 测试模式" FontWeight="Bold" Foreground="#333" Margin="0,0,0,6"/>
+                    <RadioButton Content="默认遍历（未知盒，进光×出光全遍历，重复标红）" GroupName="Mode" Margin="0,0,0,4"
+                                 IsChecked="{Binding Mode, Converter={StaticResource ModeDefault}}"/>
+                    <RadioButton Content="已知遍历（读旧表，先试预期，不达标再遍历）" GroupName="Mode" Margin="0,0,0,8"
+                                 IsChecked="{Binding Mode, Converter={StaticResource ModeKnown}}"/>
+
+                    <!-- 已知遍历：上传旧表 -->
+                    <StackPanel Visibility="{Binding IsKnownMode, Converter={StaticResource BoolToVis}}" Margin="0,0,0,8">
+                        <Button Content="⬆ 导入旧版测试报告 (.xlsx)" Height="32" Command="{Binding UploadKnownCommand}"/>
+                        <TextBlock Text="{Binding KnownReportPath, FallbackValue=未导入旧报告（已知遍历必需）}" FontSize="11" Foreground="#888"
+                                   TextWrapping="Wrap" Margin="0,4,0,0"/>
+                    </StackPanel>
+
+                    <!-- 报告目录 -->
+                    <TextBlock Text="报告目录（每次生成单独文件）" Foreground="#666" Margin="0,4,0,4"/>
+                    <TextBox Height="28" VerticalContentAlignment="Center"
+                             Text="{Binding ReportDir, UpdateSourceTrigger=PropertyChanged}"/>
+
+                    <!-- 拓扑占位 -->
+                    <Border Background="#FAFAFA" BorderBrush="#EEE" BorderThickness="1" CornerRadius="4" Margin="0,12,0,0" Height="29">
+                        <TextBlock Text="[ 进光 1-1~4-64 → Shuffle Box → 出光开关 → PD ]"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   TextWrapping="Wrap" TextAlignment="Center" Foreground="#999"/>
+                    </Border>
+
+                    <!-- 进度 -->
+                    <StackPanel Margin="0,12,0,0" Height="65">
+                        <ProgressBar Height="17" Minimum="0" Maximum="1" Value="{Binding ProgressValue}"/>
+                        <TextBlock Text="{Binding ProgressText}" Foreground="#666" FontSize="12" Margin="0,6,0,0" TextWrapping="Wrap"/>
+                        <TextBlock Text="{Binding LastReportPath, StringFormat=报告：{0}}" FontSize="11" Foreground="#1E6FD9"
+                                   TextWrapping="Wrap" Margin="0,4,0,0"/>
+                    </StackPanel>
+
+                    <!-- 启停 -->
+                    <Grid Margin="0,12,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="6"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="6"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="6"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Content="▶ 开始扫描" Style="{StaticResource ButtonPrimary}" Height="40"
+                                FontWeight="Bold" FontSize="14" Command="{Binding StartScanCommand}" IsEnabled="{Binding CanScan}"/>
+                        <Button Grid.Column="2" Content="暂停" Width="52" Height="40" Command="{Binding PauseScanCommand}"/>
+                        <Button Grid.Column="4" Content="继续" Width="52" Height="40" Command="{Binding ResumeScanCommand}"/>
+                        <Button Grid.Column="6" Content="停止" Width="52" Height="40" Command="{Binding StopScanCommand}"/>
+                    </Grid>
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <!-- ============ 右列：结果表（模板四列 + 异常标红） ============ -->
+        <Border Grid.Column="2" Background="White" CornerRadius="8" Padding="15" Effect="{StaticResource EffectShadow2}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <TextBlock Text="实时测试结果（异常整行标红）" FontWeight="Bold" Foreground="{DynamicResource PrimaryBrush}" FontSize="16" Margin="0,0,0,10"/>
+                <DataGrid Grid.Row="1" ItemsSource="{Binding Results}"
+                          AutoGenerateColumns="False" IsReadOnly="True"
+                          HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                          BorderThickness="0" Background="Transparent" CanUserAddRows="False"
+                          VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling">
+                    <DataGrid.RowStyle>
+                        <Style TargetType="DataGridRow">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsRed}" Value="True">
+                                    <Setter Property="Background" Value="#FFEBEE"/>
+                                    <Setter Property="Foreground" Value="#C62828"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </DataGrid.RowStyle>
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="通道名称" Width="70" Binding="{Binding InputChannel}"/>
+                        <DataGridTextColumn Header="进光开关" Width="80" Binding="{Binding SwitchLabel}"/>
+                        <DataGridTextColumn Header="旧输出" Width="70" Binding="{Binding ExpectedText}"/>
+                        <DataGridTextColumn Header="新输出" Width="70" Binding="{Binding OutputText}"/>
+                        <DataGridTextColumn Header="新ADC" Width="80" Binding="{Binding AdcText}"/>
+                        <DataGridTextColumn Header="已知ADC" Width="80" Binding="{Binding KnownAdcText}"/>
+                        <DataGridTextColumn Header="备注" Width="*" Binding="{Binding Remark}"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>
